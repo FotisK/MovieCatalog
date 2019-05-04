@@ -1,0 +1,21 @@
+<div class="dismiss button" onClick="CloseMoviePage();">
+		<!---a href="javascript:CloseMoviePage();"><img class="icon-button" src="./resources/dismiss.svg" alt="close"></a-->
+</div>
+<div id="movie-page">
+	<div id="movie-page-header">
+		<div id="movie-page-name"></div>
+		<div id="movie-page-subheading"></div>
+		<div id="movie-page-rating-container">
+		</div>	
+	</div>
+	<div id="movie-page-crew-container">
+	</div>
+	<div id="movie-page-cast-container">
+	</div>
+	<div id="movie-page-plot-container">
+	</div>
+	<div id="movie-page-gallery-container">
+	</div>
+	<div id="movie-page-poster-container">
+	</div>
+</div>

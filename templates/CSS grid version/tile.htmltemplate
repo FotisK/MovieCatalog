@@ -1,0 +1,18 @@
+<div class="movie_tile_box">
+	{% set posterplaceholder = './resources/poster_placeholder.jpg' %}
+	{% if movie.Status != 'Ambiguous' %}
+		{% set postersrc = './'+TorrentsPath+'/'+movie.Filename+'.ffiles/poster.jpg' %}		
+	{% else %}
+		{% set postersrc = './resources/uncertain.jpg' %}
+	{% endif %}
+	<img class="movie_poster" alt={{ movie.Filename}} data-normal="{{ postersrc }}" src="{{ posterplaceholder }}">
+	</img>
+</div>
+<div class='movie_description'>
+	<h1 class='movie_name'>{{ movie.Title }}</h1>
+	<div class="movie_tile_info movie_releaseyear">{{ movie.ReleaseYear }}</div>
+	{%if movie.Duration %}
+	<div class="movie_tile_info decorative_dot"> - </div>	
+	{% endif %}
+	<div class="movie_tile_info movie_duration">{{ movie.Duration }}mins</div>
+</div>

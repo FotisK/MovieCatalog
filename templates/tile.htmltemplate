@@ -1,0 +1,52 @@
+<div class="item-content">
+	<div class="movie_tile_box">
+
+		{% set posterplaceholder = './resources/poster_thumbnail_placeholder.jpg' %}
+		{% if movie.Status == 'Ambiguous' %}
+			{% set postersrc = './'+CachePath+'/'+ movie.Filename +'.ffiles/poster_thumbnail.jpg' %}
+			<div class="badge badge-ambiguous"><img src="./resources/question_badge.svg"  alt='ambiguous: {{ movie.Filename }}' title="ambiguous">
+			</div>
+			<a href='javascript:OpenMoviePage("{{ movie.ImdbID }}");'> 
+		{% elif movie.Status == 'Incomplete' %}
+					{% set postersrc = './'+CachePath+'/'+ movie.Filename +'.ffiles/poster_thumbnail.jpg' %}
+					<div class="badge badge-incomplete"><img src="./resources/question_badge.svg"  alt='incomplete: {{ movie.Filename }}' title="incomplete">
+					</div>
+					<a href='javascript:OpenMoviePage("{{ movie.ImdbID }}");'> 
+		{% elif movie.Status == 'Unimported' %}
+			<div class="badge badge-unimported">
+			</div>
+			{% set postersrc = './resources/nomovie.jpg' %}
+		{% elif movie.Status == 'Verified' %}
+			{% set postersrc = './'+CachePath+'/'+ movie.Filename +'.ffiles/poster_thumbnail.jpg' %}
+			<div class="badge badge-verified">
+				<img src="./resources/checkmark_badge.svg"  alt='verified: {{ movie.Filename }}' title="verified">
+			</div>
+			<a href='javascript:OpenMoviePage("{{ movie.ImdbID }}");'> 
+		{% else %}
+			{% if 'TMDBID' in movie %}
+				{% set postersrc = './'+CachePath+'/'+ movie.Filename +'.ffiles/poster_thumbnail.jpg' %}
+			{% else%}
+				{% set postersrc = './resources/uncertain.jpg' %}
+			{% endif %}
+			<a href='javascript:OpenMoviePage("{{ movie.ImdbID }}");'> 
+		{% endif %}
+		
+		<img class="movie_poster" data-normal="{{ postersrc|urlencode }}" src="{{ posterplaceholder }}">
+		</img></a>
+	</div>
+	<div class='movie_description' title='{{ movie.Filename }}'>
+		<h1 class='movie_name'>
+			{% if movie.Title %}
+				{{ movie.Title }}	
+			{% else %}
+				{{ movie.Filename }}
+			{% endif %}
+		</h1>
+		<div class="movie_tile_second_line"><span class="movie_tile_info movie_releaseyear">{{ movie.ReleaseYear }}</span>
+		{%if movie.Duration %}
+		<span class="movie_tile_info decorative_dot"></span>	
+		{% endif %}
+		{% if movie.Duration %}<span class="movie_tile_info movie_duration">{% set hours = (movie.Duration/60)|round(1,'floor')|int %}{% set minutes = (movie.Duration%60) %}{% if hours>0 %}{{ hours }}<span class="hours">h</span>{% endif %}{% if minutes>0 %} {{ minutes }}<span class="mins">mins</span>{% endif %}
+			{% endif %}</span></div>
+	</div>
+</div>

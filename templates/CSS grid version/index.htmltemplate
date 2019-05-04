@@ -1,0 +1,39 @@
+<html>
+	<head>
+		<title>
+			Movie Catalog
+		</title>
+		<style>
+			{% include 'style.csstemplate' %}
+		</style>
+	</head>
+	<body>
+		{% if foundmovies %}
+			<p>My Movies</p>
+			<div class="container">
+			{% for movie in movies %}
+				<div class='item-{{ loop.index }} item'>
+					{% include 'tile.htmltemplate' %}
+				</div>
+			{% endfor %}
+			</div>
+			<script src="./resources/layzr.min.js"></script>
+			<script src="./resources/muuri.min.js"></script>
+			<script>
+				const instance = Layzr({
+				  normal: 'data-normal',
+				  threshold: 600
+				})	
+	  			document.addEventListener('DOMContentLoaded', event => {
+				  instance
+				    .update()           // track initial elements
+				    .check()            // check initial elements
+				    .handlers(true)     // bind scroll and resize handlers
+				})
+	  			// echo.render(); is also available for non-scroll callbacks
+  			</script>
+		{% else %}
+		<p>Nothing Found</p>
+		{% endif %}
+	</body>
+</html>

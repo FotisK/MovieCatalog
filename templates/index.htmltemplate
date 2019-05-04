@@ -1,0 +1,1320 @@
+<!DOCTYPE HTML>
+<html manifest="" lang="en-US">
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>
+			Movie Catalog
+		</title>
+		<style>
+			{% include 'style.csstemplate' %}
+		</style>
+		<link rel="stylesheet" href="./resources/animate.min.css">
+	</head>
+	<body class="lightmode">
+		<div id="splash-screen-container">	
+				<div id="splash-screen">
+					<img id="splash-logo" class="animated pulse infinite slow" src="./resources/theater_mask.svg">
+					<div id="splash-name" class="">Movie<span class="strong">Catalog</span></div>
+				</div>
+			</div>
+			<div id="video" class="lightbox" onclick="hideVideo()">
+				<div class="lightbox-container">  
+					<div class="lightbox-content">
+						<button onclick="hideVideo()" class="lightbox-close">
+						Close | ✕
+						</button>
+						<div id="trailer-container" class="video-container">
+							<div id="player"></div>
+						</div>      
+					</div>
+				</div>
+			</div>
+			<div id="movie-page-container">
+				{% include 'moviepage.htmltemplate' %}
+				
+				<div id="movie-page-background">
+				</div>
+			</div>
+		{% if foundmovies %}
+			<p>My Movies</p>
+			<div class="navbar">
+				<ul>
+				  <li id="recent"><a class="btn" href="javascript:void(0);" onclick="resetFilterSelectors();filter();updateSortBy(null,'dateadded:%var% title','desc','Sort by');">Recently Added</a></li>
+				  <li id="select-kind-movies"><a href="javascript:void(0);" onclick="KindFilterAdd('movie');">Movies</a></li>
+				  <li id="select-kind-tv-series"><a href="javascript:void(0);" onclick="KindFilterAdd('tv-series tv-mini-series');">TV Shows</a></li>
+					<li id="select-genres" class="dropdown">
+				    <a  href="javascript:void(0)" class="dropbtn">Genre Selection</a>
+				    <div class="dropdown-content">
+				      <a id="select-genre-all" href="javascript:void(0);" onclick="GenreFilterAdd('','Genre Selection')">All Genres</a>
+				      {% for genre in genres %}
+				      	<a id="select-genre-{{genre}}" href="javascript:void(0);" onclick="GenreFilterAdd('{{genre}}')">{{ genre|capitalize }}</a>
+				      {% endfor %}
+				    </div>
+				  </li>
+				  <li id="select-sort-by" class="dropdown">
+				    <a href="javascript:void(0)" class="dropbtn">Sort by</a>
+				    <div class="dropdown-content">
+				      <a class="sort-order-asc" href="javascript:void(0);" onclick="updateSortBy(this,'title:%var%','tog','by Title')">Title</a>
+				      <a class="sort-order-desc" href="javascript:void(0);" onclick="updateSortBy(this,'releaseyear:%var% title','tog','by Release Year')">Release Year</a>
+				      <a class="sort-order-asc" href="javascript:void(0);" onclick="updateSortBy(this,'duration:%var% title','tog','by Duration')">Duration</a>
+				      <a class="sort-order-desc" href="javascript:void(0);" onclick="updateSortBy(this,'dateadded:%var% title','tog','by Date Added')">Date Added</a>
+				      <a class="sort-order-desc" href="javascript:void(0);" onclick="updateSortBy(this,'rating:%var% votes:%var% title','tog','by IMDB Rating')">Rating (IMDB)</a>
+				      <a class="sort-order-desc" href="javascript:void(0);" onclick="updateSortBy(this,'tmdbrating:%var% votes%var% title','tog','by TMDB Rating')">Rating (TMDB)</a>
+				      <a class="sort-order-desc" href="javascript:void(0);" onclick="updateSortBy(this,'metarating:%var% votes%var% title','tog','by Metascore')">Metascore</a>
+				      <a class="sort-order-desc" href="javascript:void(0);" onclick="updateSortBy(this,'votes:%var% votes title','tog','by Popularity')">Popularity</a>
+				    </div>
+				  </li>
+				  <li id="searchbar">
+				  	<div class="control search">
+			          <div class="control-icon">
+			          </div>
+			          <input class="control-field search-field form-control " type="text" name="search" placeholder="Search...">
+			          <div class="reset-icon">
+			          </div>
+			        </div>
+			      </li>
+				  <li id="conflicts"><a class="btn" href="javascript:void(0);" onclick="resetFilterSelectors();grid.filter('.kind-unknown, .status-ambiguous, .status-unimported, .status-incomplete');">Conflicts</a></li>
+				  <li id="toggle-light" style="float:right"><a class="icon-button" href="javascript:void(0);" onclick="$('body').toggleClass('lightmode')"></a></li>
+				</ul>
+			</div>
+			<div class="grid">
+			{% for movie in movies %}
+				{% set genrestring = movie.Genres|join(' ') %}
+				<div class='item-{{ loop.index0 }} item genre-{{ movie.Genres | join(" genre-") }} kind-{{ movie.Kind|replace(" ","-")|lower }} status-{{ movie.Status|replace(" ","-")|lower }}' data-duration='{{ movie.Duration }}' data-filename='{{ Filename }}' data-title='{{ movie.Title }}' data-releaseyear='{{ movie.ReleaseYear }}' data-rating='{{ movie.ImdbRating }}' data-votes='{{ movie.ImdbVotes }}' data-dateadded='{{ movie.DateImported or movie.DateAdded }}'
+				data-status='{{ movie.Status }}' data-movieid='{{ movie.MovieID }}' data-catalog-index={{ loop.index0 }}>
+					{% include 'tile.htmltemplate' %}
+				</div>
+			{% endfor %}
+			</div>
+			<script type=text/javascript>
+				var CastOrderBy = "weighted"; //const [ weighted/file/key]: what algorithm to use for ordering actors in movie? weighted: my blackmagic sauce file: order in file (default) key: according to TMDB order
+				var CachePath = "./{{ CachePath }}/";
+				var MoviesCatalog = {{ movies|tojson|safe }};
+				var selectedMovie={};
+				var WaitStatus = 1;
+				var player; //youtube player API object
+				var done = false;
+				var cntrlIsPressed = false; //control/cmd key pressed?
+				var AllGenreFilters=new Set;
+				var AllKindFilters=new Set;
+				var ActiveGenreFilters=new Set; //genre filters animation, drama, ...
+				var ActiveKindFilters=new Set; //movie, tv-series, tv-mini-series
+
+				//ActiveKindFilters.add("movie").add("tv-series").add("tv-mini-series"); 
+
+				//console.log("A: " + WaitStatus);
+			</script>
+			<script src="./resources/web-animations.min.js"></script>
+			<script src="./resources/jquery-3.3.1.min.js"></script>
+			<script>	
+				$(document.body).css("overflow","hidden");
+				WaitStatus++;
+				//console.log("B: " + WaitStatus);
+				const element =  document.querySelector('#splash-name');
+				element.addEventListener('animationend', function () {
+					WaitStatus--;
+					//console.log("C: " + WaitStatus);
+				});
+				$('#splash-name').addClass("shine");
+				//$('#splash-name').addClass("shine");
+				//$('#splash-name strong').addClass("animated zoomOut shine delay-1s");
+				
+				WaitStatus++;
+				//console.log("M: " + WaitStatus);
+			</script>
+			<script src="./resources/muuri.min.js"></script>
+			<script>
+				var grid = new Muuri('.grid', {
+  					showDuration: 600,
+  					hideDuration: 600,
+  					layoutOnResize: 0,
+  					layoutDuration: 0,
+  					layout: {fillGaps: false},
+  					sortData: {
+					    duration: function (item, element) {
+					    	var tmp=parseInt(element.getAttribute('data-duration'));
+					    	if (isNaN(tmp)) {
+						    	return 999999;
+						    }else {
+						    	return tmp;
+						    }
+					    },
+					    filename: function (item, element) {
+					      return element.getAttribute('data-filename').toUpperCase();
+					    },
+					    title: function (item, element) {
+					      var tmp=element.getAttribute('data-title').toUpperCase();
+					    	if (!tmp) {
+						    	console.log(tmp);
+						    	return "ZZZZZZZZZZZZ";
+						    }else {
+						    	return tmp;
+						    }
+					    },
+					    releaseyear: function (item, element) {
+					    	var tmp=parseInt(element.getAttribute('data-releaseyear'));
+					    	if (isNaN(tmp)) {
+						    	return 0;
+						    }else {
+						    	return tmp;
+						    }
+					    },
+					    rating: function (item, element) {
+						    var ratings=parseFloat(element.getAttribute('data-rating'));
+						    if (isNaN(ratings)) {
+						    	//console.log(ratings);
+						    	return 0;
+						    }else {
+						    	return ratings;
+						    }
+					    },
+					    tmdbrating: function(item, element){
+							var CatalogIndex = parseInt(element.getAttribute('data-catalog-index'));
+							if ('TMDBRating' in MoviesCatalog[CatalogIndex]){
+								return MoviesCatalog[CatalogIndex]['TMDBRating'];
+							}else
+								return 0;
+					    },
+					    metarating: function(item, element){
+							var CatalogIndex = parseInt(element.getAttribute('data-catalog-index'));
+							if ('Metascore' in MoviesCatalog[CatalogIndex]){
+								return MoviesCatalog[CatalogIndex]['Metascore'];
+							}else
+								return 0;
+					    },
+					    votes: function (item, element) {
+					    	var votes= parseInt(element.getAttribute('data-votes'));
+					    	if (isNaN(votes)) {
+						    	return 0;
+						    }else {
+						    	return votes;
+						    }
+					    },
+					    dateadded: function (item, element) {
+					      return element.getAttribute('data-dateadded');
+					    },
+					    status: function (item, element) {
+					      return element.getAttribute('data-status').toUpperCase();
+					    }
+					}
+				});
+				//console.log("endmuri: " + WaitStatus);
+				buildAllGenreFilters();
+				WaitStatus--;
+
+				$('.item').hover(function () {
+				    var element = $(this)[0];//.getElement();
+					var CatalogIndex = parseInt(element.getAttribute('data-catalog-index'));
+				    if (['Verified','Unverified','Ambiguous','Incomplete'].indexOf(MoviesCatalog[CatalogIndex]['Status'])>-1 && 'ImdbID' in MoviesCatalog[CatalogIndex]) {
+				    	$(this).append('<div id="hover-container"><div id="hover-ratings" title="ratings"></div><div id="hover-plot"></div><div id="hover-genres"></div><div id="hover-trailer"></div></div>');
+						$("#hover-container").click(function(event) {
+							OpenMoviePage(MoviesCatalog[CatalogIndex]['ImdbID']);	
+							event.stopPropagation();
+						});
+					}
+					if ('TrailerID' in MoviesCatalog[CatalogIndex]){
+						var tmpName='\''+MoviesCatalog[CatalogIndex]['TrailerID']+'\'';
+						$('#hover-trailer').append('<div id="hover-trailer-button"><a href="javascript:void(0);"><img src="./resources/playback.svg" alt="trailer" title="trailer button"></a></div>');
+						$("#hover-trailer-button a").click(function(event) {
+							player.loadVideoById(MoviesCatalog[CatalogIndex]["TrailerID"]);
+							player.playVideo();
+							revealVideo(tmpName);
+							event.stopPropagation();
+						});
+					}
+					if ('ImdbRating' in MoviesCatalog[CatalogIndex]){
+						//$('#hover-ratings').append('');
+						$('#hover-ratings').append('<div id="hover-ratings-imdb"><img src="./resources/imdb_square.svg" id="hover-ratings-imdb-label" alt="imdb logo" title="imdb logo">'+MoviesCatalog[CatalogIndex]['ImdbRating']+'</div>');
+					}
+					if ('TMDBRating' in MoviesCatalog[CatalogIndex]){
+						//$('#hover-ratings').append('<div id="hover-ratings-tmdb-label">TMDB:</div');
+						$('#hover-ratings').append('<div id="hover-ratings-tmdb"><img src="./resources/tmdb.svg" id="hover-ratings-tmdb-label" alt="tmdb logo" title="tmdb logo">'+MoviesCatalog[CatalogIndex]['TMDBRating']+'</div>');
+					}
+					if ('Metascore' in MoviesCatalog[CatalogIndex]){
+						//$('#hover-ratings').append('<div id="hover-ratings-meta-label">Metacritic:</div');
+						$('#hover-ratings').append('<div id="hover-ratings-meta"><img src="./resources/metacritic.svg" id="hover-ratings-meta-label" alt="metacritic logo" title="metacritic logo">'+MoviesCatalog[CatalogIndex]['Metascore']+'</div>');
+					}
+					if ('Plot' in MoviesCatalog[CatalogIndex] || 'Synopsis' in MoviesCatalog[CatalogIndex]){
+						var plot = "";
+						var synopsis ="";
+						var story;
+						if ('Plot' in MoviesCatalog[CatalogIndex]) {
+							plot=MoviesCatalog[CatalogIndex]['Plot'];
+						}
+						if ('Synopsis' in MoviesCatalog[CatalogIndex]){
+							synopsis=MoviesCatalog[CatalogIndex]['Synopsis'];	
+						}
+						if (plot === "") {
+							story = synopsis;
+						}else if (synopsis === ""){
+							story = plot;
+						}else if (plot.length >= synopsis.length){
+							story = synopsis;
+						}else{
+							story=plot;
+						}
+						if (story !== ""){
+							$('#hover-plot').append('<div id="hover-plot-text">'+story+'</div>');
+						}
+						
+					}
+					if ('Genres' in MoviesCatalog[CatalogIndex]){
+						$('#hover-genres').append('<div id="hover-genres-list">'+MoviesCatalog[CatalogIndex]['Genres'].join(", ")+'</div>');
+					}
+					$('#hover-container').removeClass('animated fadeIn faster');
+					$('#hover-container').addClass('animated fadeIn faster');
+
+					$('#hover-plot').removeClass('animated fadeIn');
+					$('#hover-plot').addClass('animated fadeIn ');
+
+					$('#hover-trailer').removeClass('animated fadeIn faster delay-250ms');
+					$('#hover-trailer').addClass('animated fadeIn faster delay-250ms');
+
+					$('#hover-ratings-imdb').removeClass('animated fadeInLeft faster ');
+					$('#hover-ratings-imdb').addClass('animated fadeInLeft faster');
+					$('#hover-ratings-tmdb').removeClass('animated fadeInLeft faster delay-250ms');
+					$('#hover-ratings-tmdb').addClass('animated fadeInLeft faster delay-250ms');
+					$('#hover-ratings-meta').removeClass('animated fadeInLeft faster delay-500ms');
+					$('#hover-ratings-meta').addClass('animated fadeInLeft faster delay-500ms');
+
+					$('#hover-genres').removeClass('animated fadeInUp delay-250ms');
+					$('#hover-genres').addClass('animated fadeInUp delay-250ms');
+				},function () {
+				    $('#hover-container').remove();
+				});
+				// Example of the blur event https://stackoverflow.com/questions/3478654/is-there-a-browser-event-for-the-window-getting-focus
+			 	window.addEventListener("blur", function(event) { 
+						//bug 99128021: when cmd+tabing, while in the dropdown genres menu it assumes that cmd is pressed
+						//doesnt know how to release it. Somehow code below doesn't work - or does it?
+						console.log(cntrlIsPressed);
+						cntrlIsPressed = false;
+						//console.log("restored window");
+						console.log(cntrlIsPressed);
+					},	false);
+					
+				$(document).keyup(function(e) {
+				    if (e.key === "Escape") { // escape key maps to keycode `27`
+				     	//console.log("ESC!");
+						var moviepagedisplaystatus = $('#movie-page-container').css('display');
+						var lightboxdisplaystatus = $('.lightbox').css('display');
+				     	//console.log(displaystatus);
+				     	if ( lightboxdisplaystatus === "block") {
+				     		hideVideo();
+				     	}
+				     	if ( moviepagedisplaystatus === "block") {
+				     		CloseMoviePage();
+				     	}
+				     	e.preventDefault();
+				    }
+				    if (e.which=="17" || e.which=="91" || e.which=="93" || e.which=="224" ) {
+				    	cntrlIsPressed = false;
+				    	e.preventDefault();
+				    	//console.log("unpressed Ctrl/cmd/alt");
+				    }
+				 });
+				var searchFieldResetButton = document.querySelector('.reset-icon');
+				console.log(searchFieldResetButton);
+				searchFieldResetButton.addEventListener('click', function (event) {
+					//var searchField = document.querySelector('.search-field');
+					searchField.value = "";
+					var newSearch = "";
+					filter();
+			    });
+				var searchField = document.querySelector('.search-field');
+				searchField.addEventListener('keyup', function (e) {
+				       var newSearch = searchField.value.toLowerCase();
+				       if (e.key === "Enter") {
+					        searchFieldValue = newSearch;
+					        filter();
+					      }
+			    });
+
+
+				function filter() {
+					var searchField = document.querySelector('.search-field');
+					var searchFieldValue = searchField.value.toLowerCase();
+					/*if ( typeof filter.FoundMatch == 'undefined' ) {
+					        filter.FoundMatch = false;
+					    }*/
+					combined_filter = buildFilterSelectors();
+					//console.log("cf:" + combined_filter);
+					var searchFieldValue = searchField.value.toLowerCase();
+					var FoundMatch = false;
+					
+					function onFilterEnd () {
+						console.log("done filtering!");
+					};
+
+					grid.filter(function (item) {
+					  var element = item.getElement();
+					  var CatalogIndex = parseInt(element.getAttribute('data-catalog-index'));
+					  //console.log("index is:");
+					  //console.log(CatalogIndex);
+					  //console.log(MoviesCatalog[CatalogIndex]);
+					  var isFilterMatch = element.matches(combined_filter);
+					  //console.log("is Filter Match: " +combined_filter);
+					  //console.log(isFilterMatch);
+					  function isListItem(key){
+					  	var tmpMatch = false;
+					  	if (!FoundMatch && key in MoviesCatalog[CatalogIndex]) {
+					  		//console.log(key + MoviesCatalog[CatalogIndex]['Title']);
+					  		//console.log(MoviesCatalog[CatalogIndex][key]);
+					  		var ListLength = MoviesCatalog[CatalogIndex][key].length;
+					  		var index = 0;
+					  		while ( !tmpMatch && index < ListLength ){
+					  			tmpMatch=MoviesCatalog[CatalogIndex][key][index].toLowerCase().includes(searchFieldValue);
+					  			index++;
+						  	}
+						  	//console.log("-");
+					  	}
+					  	return tmpMatch;
+					  };
+
+					  function isPersonName(key){
+					  	var tmpMatch = false;
+					  	if (!FoundMatch && key in MoviesCatalog[CatalogIndex]) {
+					  		var ListLength = MoviesCatalog[CatalogIndex][key].length;
+					  		var index = 0;
+					  		while ( !tmpMatch && index < ListLength ){
+					  			tmpMatch=MoviesCatalog[CatalogIndex][key][index]['Name'].toLowerCase().includes(searchFieldValue);
+					  			index++;
+						  	}
+					  	}
+					  	if (tmpMatch) FoundMatch = true;
+					  	return tmpMatch;
+					  };
+
+					  function isMatch(key){
+					  	if (!FoundMatch && key in MoviesCatalog[CatalogIndex]) 
+					  	{
+						  	//isTitleMatch = element.getAttribute('data-title').toLowerCase().indexOf(searchFieldValue) > -1
+						  	var tmpMatch = false;
+						  	if (typeof MoviesCatalog[CatalogIndex][key] === 'string'){
+							  	tmpMatch=MoviesCatalog[CatalogIndex][key].toLowerCase().includes(searchFieldValue);
+							  }
+							 else if (typeof MoviesCatalog[CatalogIndex][key] === 'number'){
+								var tmpNumber = parseInt (searchFieldValue);
+							 	if (tmpNumber >0) tmpMatch=(MoviesCatalog[CatalogIndex][key] == tmpNumber);
+							 }
+						  	if (tmpMatch) {
+						  		FoundMatch = true;
+						  		//console.log(key);
+						  	}
+						  	return tmpMatch;
+						}
+						return false;
+					  };
+
+					  var isFieldMatch=(isMatch("ReleaseYear")||isMatch("ImdbID")||isMatch("TMDBID")||isMatch("Title")||isMatch("OriginalTitle")||isMatch("Filename")||isMatch("Plot")||isMatch("Synopsis")||isMatch("Summary"));
+					  var isKeywordMatch=(isListItem("Keywords")||isListItem("Languages")||isListItem("Countries")||isListItem("Genres")||isListItem("Taglines")); //removed isListItem("OtherTitles") since it has titles followed by language, throwing off "search by langunage" without much gain - who cares about the italian title of LotR? As long as it's the original & english we're fine - perhaps the kanji/pinyin would be useful, but anyway...
+					  var isPersonMatch=(isPersonName("Directors")||isPersonName("Writers")||isPersonName("Cinematographers")||isPersonName("Producers")||isPersonName("Cast"));
+
+					  /*if (FoundMatch){
+						  console.log("found:" + MoviesCatalog[CatalogIndex]['Title']+" at " + CatalogIndex);
+						  	console.log("found!");
+					  	if (isFieldMatch){
+					  		console.log("is Search Match");
+					  	}
+					  	if (isPersonMatch){
+						  	console.log("is Director Match");		
+					  	}
+					  	if (isKeywordMatch){
+					  		console.log("is Keyword Match");	
+					  	}
+					  }*/
+					  //var isFilterMatch = if (element.getAttribute('data-color') || '') === filterFieldValue;
+					  FoundMatch=false;
+					  return ((isFieldMatch || isKeywordMatch || isPersonMatch) && isFilterMatch);
+					},{onFinish: onFilterEnd});
+				}
+
+				$(document).keydown(function(e) {
+					if (e.which=="17" || e.which=="91" || e.which=="93" || e.which=="224") {
+						cntrlIsPressed = true;
+						e.preventDefault()
+						//console.log("pressed Ctrl/cmd/alt");
+					}
+				});
+
+				function resetFilterSelectors(){
+					ActiveGenreFilters.clear();
+					ActiveKindFilters.clear();
+					var searchField = document.querySelector('.search-field');
+					searchField.value = '';
+					updateFilterSelectors();
+				}
+
+				function buildAllGenreFilters(){
+					$('[id^=select-genre-]').each(function() {
+						var tmpString = $(this).attr('id');
+						var tmpString2 = tmpString.replace('select-genre-','');
+					    AllGenreFilters.add(tmpString2);
+					});
+				}
+
+				function updateFilterSelectors(){
+					AllGenreFilters.forEach(function(a1){
+						if (ActiveGenreFilters.has(a1)){
+							//console.log(a1+" is active!");
+							$('#select-genre-'+a1).addClass("active-genre-class");
+						}
+						else{
+							$('#select-genre-'+a1).removeClass("active-genre-class");
+						}
+					})
+					if (ActiveGenreFilters.size == 0) {
+						$('#select-genres>a').text("Select Category");
+						$('#select-genre-all>a').addClass("active-genre-class");
+						//todo: toggle off everything else
+					}else {
+						$('#select-genres>a').text(Array.from(ActiveGenreFilters).join('/'));
+					}
+					
+					//console.log("AKFilters");
+					//console.log(ActiveKindFilters);
+					var hasMovies=ActiveKindFilters.has("movie");
+					var hasSeries=(ActiveKindFilters.has("tv-series")||ActiveKindFilters.has("tv-mini-series"));
+					if (hasMovies != hasSeries){
+						//console.log("only one is active!!");
+						if (hasMovies){
+							$('#select-kind-movies').addClass("active-kind-class");
+							$('#select-kind-tv-series').removeClass("active-kind-class");
+						} else {
+							$('#select-kind-tv-series').addClass("active-kind-class");
+							$('#select-kind-movies').removeClass("active-kind-class");
+						}
+					}
+					else{
+						$('#select-kind-movies').removeClass("active-kind-class");
+						$('#select-kind-tv-series').removeClass("active-kind-class");
+					}
+					//$('#select->a').text(Array.from(ActiveGenreFilters).join('/'));
+				}
+
+				function buildFilterSelectors(){
+					//console.log("building query");
+					var combined_genrefilters="";
+					//build Genre selectors Query
+					if (ActiveGenreFilters.size==0) {
+						combined_genrefilters ="";
+						//console.log("reached empty genre list!");
+					} else {
+						ActiveGenreFilters.forEach(function(a1){
+							combined_genrefilters+= ".genre-" +a1;
+							//console.log("added genre "+a1);
+						});
+					}
+					//console.log("genres query is: "+combined_genrefilters);
+					var combined_filter="";//OR filters
+					var tmpSelectors=new Set;
+					//build Kind selectors Query
+					ActiveKindFilters.forEach(function(a1){
+						tmpSelectors.add(".kind-"+a1+ combined_genrefilters);
+						//console.log("added kind "+a1);
+					});
+					if (tmpSelectors.size==0){
+						tmpSelectors.add(combined_genrefilters);
+					}
+					combined_filter = Array.from(tmpSelectors).join(', ');
+					//console.log("genres&kind query is: "+combined_filter);
+					if (combined_filter === ""){
+						combined_filter=".item";
+					}
+					return combined_filter;
+				}
+				function GenreFilterAdd(genreString='',label = "",force_addition=false){
+					genres=genreString.split(" ");
+					if (!cntrlIsPressed && force_addition==false){
+						ActiveGenreFilters.clear();
+					}
+					genres.forEach(function(tmpGenre){
+						if (ActiveGenreFilters.has(tmpGenre)){
+							ActiveGenreFilters.delete(tmpGenre);
+						}else{
+							if (tmpGenre!=='') ActiveGenreFilters.add(tmpGenre);
+						}	
+					})
+					//console.log(genres);
+					combined_filter = buildFilterSelectors();
+					//console.log("BFS1: "+ combined_filter);
+					filter();
+					//grid.filter(combined_filter);
+					if (ActiveGenreFilters.size == 0) {
+						$('#select-genres>a').text("Select Category");
+					}else if (label === ""){
+						$('#select-genres>a').text(Array.from(ActiveGenreFilters).join('/'));
+					} else{
+						$('#select-genres>a').text(label);
+					}
+					updateFilterSelectors();
+				}
+
+				function KindFilterAdd(kindString = "",force_addition=false){
+					kinds=kindString.split(" ");
+					if (!cntrlIsPressed && force_addition==false){
+						ActiveKindFilters.clear();
+					}
+					kinds.forEach(function(tmpKind){
+						//console.log("tmpKind: "+tmpKind);
+						if (ActiveKindFilters.has(tmpKind)){
+							ActiveKindFilters.delete(tmpKind);
+						}else{
+							if (tmpKind!=='') ActiveKindFilters.add(tmpKind);
+						}	
+					})
+					
+					if (ActiveKindFilters.size == 0) {
+						//ActiveKindFilters.add("movie").add("tv-series").add("tv-mini-series"); 
+					}
+					combined_filter = buildFilterSelectors();
+					//console.log("BFS2: "+ combined_filter);
+					filter();//grid.filter(combined_filter);
+					
+					updateFilterSelectors();
+				}
+
+				function updateSortBy(elem,sort_by,defaultdir="asc",label="Sort by"){
+					if (elem !== null) {
+						var order_class = $(elem).attr("class");
+						//console.log("starting class:"+order_class);
+					}
+					dir=FindStringInVariable(sort_by);
+					/*if (defaultdir=="tog") {
+						dir="var";
+					}*/
+					//console.log("new dir is: "+dir);
+					//console.log("0");
+					if (elem !== null) {
+						direction="sort-order-"+dir;
+						//console.log("elem with order_class is "+order_class);
+						if (direction=="sort-order-asc"){
+							//console.log("1");
+							$(elem).removeClass("sort-order-desc");
+							$(elem).addClass("sort-order-asc");
+						}else if (direction=="sort-order-desc"){
+							//console.log("2");
+							$(elem).addClass("sort-order-desc");
+							$(elem).removeClass("sort-order-asc");
+						}else if (direction=="sort-order-var"){
+							//console.log("3");
+							if ($(elem).hasClass("sort-order-desc")){
+								$(elem).removeClass("sort-order-desc");
+								//console.log("4");
+							}else{
+								$(elem).addClass("sort-order-desc");
+								dir="asc";
+								//console.log("5 new dir:"+dir);
+							}
+							//console.log("6");
+							if ($(elem).hasClass("sort-order-asc")){
+								//console.log("7");
+								$(elem).removeClass("sort-order-asc");
+							}else{
+								$(elem).addClass("sort-order-asc");
+								dir="desc";
+								//console.log("9 new dir:"+dir);
+							}
+							if ($(elem).hasClass("sort-order-asc") && $(elem).hasClass("sort-order-desc")){
+								//console.log("9");
+								console.log("hmm, the following element has both ASC and DESC classes-bug:");
+								console.log(elem);
+							}
+						}
+						var order_class2 = $(elem).attr("class");
+						//console.log("new class:"+order_class2);
+						//console.log("10");
+					}
+					if (dir == "var"){
+						// enters here only if element was empty - meaning that there was no class to toggle (Eg. recents)
+						dir = defaultdir; // fallback to default value
+					}
+					var sort_by2 = FormatStringWithVariable(sort_by,dir);
+					//console.log(sort_by2);
+					grid.sort(sort_by2);
+					//console.log("sorting by: "+sort_by2);
+					$('#select-sort-by>a').text(label);
+					if (elem !== null){
+						if ($(elem).hasClass("sort-order-asc")){
+							//console.log("11");
+							$("#select-sort-by").css("--sort-icon-toggle", "var(--sort-icon-toggle-asc)");
+						}else if ($(elem).hasClass("sort-order-desc")){
+							//console.log("12");
+							$("#select-sort-by").css("--sort-icon-toggle", "var(--sort-icon-toggle-desc)");
+						}else{
+							//console.log("13");
+							console.log("hmm, the following element has no ASC/DESC - strange");
+							console.log(elem);
+						}
+						//console.log("14(end)");
+					}
+				}
+
+				function FindStringInVariable(strString){
+					//
+					// recongizes strings with format and returns the variable name:
+					// ".selector1:%order%, .selector2:%order2%, .selector3:%order3%"
+					//
+					var res = /%(\w{3,4})%/.exec(strString);
+					/*console.log("str is: "+ strString);
+					console.log("var is: "+ res[1]);
+					console.log(res);*/
+					return res[1];
+				}
+
+				function FormatStringWithVariable(strString,tog_value){
+					//
+					// recongizes strings with format:
+					// ".selector1:%order%, .selector2:%order2%, .selector3:%order3%"
+					// whereas %order% is a placeholder either: %tog%,%var%,%asc%,%desc%,%invv%
+					// %tog% and %var% are the same: the pass the tog_value. the other 
+					// two options pass asc or desc. Inv is inverse variable:
+					//
+					var res = strString.replace(/%var%/g, tog_value);
+					res = res.replace(/%var%/g, tog_value);
+					res = res.replace(/%var%/g, "asc");
+					res = res.replace(/%var%/g, "desc");
+					if (tog_value === "asc"){
+						res = res.replace(/%var%/g, "desc");
+					} else{
+						res = res.replace(/%var%/g, "asc");
+					}
+					return res;
+				}
+
+				$(document).ready(function(){
+					WaitStatus--;
+					//console.log("D: " + WaitStatus);
+					// your code
+					//console.log("document ready!");
+					var el = document.getElementById("splash-screen-container");
+					el.addEventListener("animationend", function(e){
+						if (e.target == el) {
+     					   // this is your completion event!
+     					   WaitStatus--;
+     					   //console.log("E: " + WaitStatus);
+    					} else{
+    						//console.log("E: bubble!");
+    					}
+					});
+					el.addEventListener("animationcancel", function(e){
+						if (e.target == el) {
+     					   // this is your completion event!
+     					   WaitStatus--;
+     					   //console.log("E2: " + WaitStatus);
+    					} else{
+    						//console.log("E2: bubble!");
+    					}
+					});
+					el.addEventListener("animationstart", function(e){
+						//console.log(e);
+						//console.log(el);
+						if (e.target == el) {
+     					   // this is your completion event!
+     					   $(document.body).css("overflow","initial");
+     					   WaitStatus++;
+     					   //console.log("F: " + WaitStatus);
+    					} else{
+    						//console.log("F: bubble!");
+    					}
+
+					});
+					//console.log("is it done?");
+					isItDoneLoading();
+				});
+				function isItDoneLoading() {
+    					if (WaitStatus>0) {
+    						//console.log("nope, still "+ WaitStatus);
+        					setTimeout(isItDoneLoading,500); // setTimeout(func, timeMS, params...)
+    					} else {
+    						//console.log("yes!!! "+ WaitStatus);
+    						var y = document.getElementById("splash-screen-container");
+    						y.addEventListener("animationend", DoneHiding,{once: true});
+    						y.addEventListener("animationcancel", DoneHiding,{once: true});
+    						$('#splash-screen-container').addClass("animated fadeOut slowest");
+    					}
+					}
+				function DoneHiding(e) {
+					//console.log("G: " + WaitStatus);
+					e.stopPropagation();
+					$('#splash-screen-container').addClass("invisible");
+					$('#splash-screen-container').removeClass("animated fadeOut");
+					//console.log("done hiding");
+				}
+
+				var origRefreshDimensions = Muuri.prototype._refreshDimensions;
+				Muuri.prototype._refreshDimensions = function () {
+					//get first active item - assume they are all equal in size!!!!
+					var w = grid.getItems(0)[0].getWidth();
+					var m = grid.getItems(0)[0].getMargin();
+      				element_width = w + m.left + m.right;
+					var grid_width = $('body').width();
+					new_grid_width = element_width*Math.floor(grid_width/element_width);
+					$('.grid').width(new_grid_width);
+				  return origRefreshDimensions.call(this);
+				};
+			</script>
+			<script src="./resources/layzr.min.js"></script>
+			<script src="./resources/vibrant.js"></script>
+			<script>
+				//grid.refreshSortData();
+				//grid.sort('status title');
+				resetFilterSelectors();
+				grid.sort('dateadded:desc title');
+				//updateSortBy(null,'dateadded:%desc% title','desc','Sort by');
+				const layzrinstance = Layzr({
+				  normal: 'data-normal',
+				  threshold: 600
+				});
+
+				grid.on('filter', function (shownItems, hiddenItems) {
+					//console.log("V: " + WaitStatus);
+					layzrinstance.check(),
+					layzrinstance.update()
+				});
+				grid.on('sort', function (currentOrder, previousOrder) {
+					//console.log("W: " + WaitStatus);
+  					layzrinstance.check(),
+					layzrinstance.update()
+  				});
+				grid.on('layoutStart', function (currentOrder, previousOrder) {
+  					WaitStatus++;
+  					//console.log("O: " + WaitStatus);
+  				});
+				grid.on('layoutEnd', function (currentOrder, previousOrder) {
+					//console.log("Z: " + WaitStatus);
+  					layzrinstance.check(),
+					layzrinstance.update()
+					WaitStatus--;
+					//console.log("P: " + WaitStatus);
+  				});
+	  			document.addEventListener('DOMContentLoaded', event => {
+				  layzrinstance
+				    .update()           // track initial elements
+				    .check()            // check initial elements
+				    .handlers(true)     // bind scroll and resize handlers
+				});
+
+	  			function OpenMoviePage(movieID) {
+					selectedMovie = MoviesCatalog.find(Movie => Movie.ImdbID == movieID);
+					//console.log(selectedMovie);
+					if (!selectedMovie) {
+						return;
+					}
+					$(document.body).css("overflow","hidden");
+					var bg = new Image;
+					$('#movie-page-background').css('background-image', '');
+						bg.src = CachePath + encodeURIComponent(selectedMovie['Filename']) + ".ffiles/backdrop.jpg";
+						bg.onerror = function(){
+							//Somehow because the error is Async
+							//I can't really catch this error until it's too late :/
+							//Anyway, this is here just as a placeholder
+							return true;
+						};
+					bg.onload = function() {
+						var opts = {ImageClass: Image.Browser};
+							/*colorCount: number
+						    quality: number
+						    maxDimension: number
+						    filters: Array<Filter>
+						    
+						    quantizer: Quantizer
+						    generator?: Generator*/
+						//bg.setAttribute('crossOrigin', '');
+						//var v = new Vibrant(img.src, opts);
+						//v.getPalette().then((palette) => console.log(palette));
+						selectedMovie["BackdropImage"] = bg;
+				        var relativewidth = $('#movie-page-container').outerWidth()/bg.width;
+				        var relativeheight = bg.height*relativewidth;
+				        /*var backdropurl = '-webkit-linear-gradient(top, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) '+0.5*relativeheight+'px, rgba(0, 0, 0,0.2)'+0.8*relativeheight+'px, rgba(0, 0, 0,1) '+relativeheight+'px), url("./{{ CachePath }}/' + selectedMovie['Filename'] + '.ffiles/backdrop.jpg")';*/
+						var stoppoint00 = 0.0*relativeheight+'px'; //0.5
+						var stoppoint01 = 0.3*relativeheight+'px'; //0.5
+						var stoppoint02 = 0.6*relativeheight+'px'; //0.8
+						var stoppoint03 = 1.0*relativeheight+'px'; //1.0
+						var bodyStyles = window.getComputedStyle(document.body);
+						var st01 = bodyStyles.getPropertyValue('--stoppoint01'); //get
+						var st02 = bodyStyles.getPropertyValue('--stoppoint02'); //get
+						var st03 = bodyStyles.getPropertyValue('--stoppoint03'); //get
+						var st03 = bodyStyles.getPropertyValue('--stoppoint00'); //get
+						document.body.style.setProperty('--stoppoint01', stoppoint01);//set
+						st01 = bodyStyles.getPropertyValue('--stoppoint01'); //get
+						document.body.style.setProperty('--stoppoint02', stoppoint02);//set
+						document.body.style.setProperty('--stoppoint03', stoppoint03);//set
+						document.body.style.setProperty('--stoppoint00', stoppoint00);//set
+				        var backdropurl = '-webkit-linear-gradient(top, var(--gradient-color-00) var(--stoppoint00), var(--gradient-color-00) var(--stoppoint01), var(--gradient-color-05) var(--stoppoint02), var(--gradient-color-10) var(--stoppoint03)), -webkit-linear-gradient(top, var(--gradient-cast-07) 0%, var(--gradient-cast-07) 100%), url("./{{ CachePath }}/' + encodeURIComponent(selectedMovie['Filename']) + '.ffiles/backdrop.jpg")';
+				        $('#movie-page-background').css('background-image',backdropurl);
+				         // Unbind window resize event listener.
+					    if (grid._resizeHandler) {
+					      window.removeEventListener('resize', grid._resizeHandler);
+					  	}
+				        jQuery(window).resize(function() {
+				        	var relativewidth = $('#movie-page-container').outerWidth()/bg.width;
+					        var relativeheight = bg.height*relativewidth;
+					        var stoppoint01 = 0.3*relativeheight+'px';
+									var stoppoint02 = 0.5*relativeheight+'px';
+									var stoppoint03 = 1.0*relativeheight+'px';
+									var bodyStyles = window.getComputedStyle(document.body);
+									var st01 = bodyStyles.getPropertyValue('--stoppoint01'); //get
+									var st02 = bodyStyles.getPropertyValue('--stoppoint02'); //get
+									var st03 = bodyStyles.getPropertyValue('--stoppoint03'); //get
+									document.body.style.setProperty('--stoppoint01', stoppoint01);//set
+									document.body.style.setProperty('--stoppoint02', stoppoint02);//set
+									document.body.style.setProperty('--stoppoint03', stoppoint03);//set
+				        });
+
+					 };
+					$('#movie-page-name').text(selectedMovie['Title']);
+					var tmpText = "";
+					if ('Synopsis' in selectedMovie) {
+						tmpText = selectedMovie['Synopsis'];
+					}
+					if ('Plot' in selectedMovie) {
+						if (tmpText.length == 0 || tmpText.length > selectedMovie['Synopsis'].length){
+							tmpText = selectedMovie['Synopsis'];
+						}
+					} 
+					if (tmpText.length > 0){
+						var tmpSummary = tmpText.slice(0, 9999); //display 512 characters
+						var tmpMore = tmpText.slice(9999, tmpText.length); //add the rest into details	
+						
+						if (tmpMore.length>0) {
+							$('#movie-page-plot-container').append('<details id="movie-summary-text"><summary><h2 id="movie-summary-title">Summary</h2><p>'+tmpSummary+'</p></summary>'+'<p>'+tmpMore+'</p></details>');
+						}else{
+							$('#movie-page-plot-container').append('<h2 id="movie-summary-title" class="movie-page-label">Summary</h2>');
+							$('#movie-page-plot-container').append('<p id="movie-summary-text">'+tmpSummary+'<p>');
+						}
+					}
+
+					if ('OriginalTitle' in selectedMovie && selectedMovie['OriginalTitle'] !== selectedMovie['Title']) $('#movie-page-subheading').append('<div id="subheading-original-title">'+selectedMovie['OriginalTitle']+'</div>');
+					if ('ReleaseYear' in selectedMovie) $('#movie-page-subheading').append('<div id="subheading-release-year">'+selectedMovie['ReleaseYear']+'</div>');
+					if ('Countries' in selectedMovie) $('#movie-page-subheading').append('<div id="subheading-countries">'+selectedMovie['Countries'].join(", ")+'</div>');
+					if ('Genres' in selectedMovie) $('#movie-page-subheading').append('<div id="subheading-genres">'+selectedMovie['Genres'].join(", ")+'</div>');
+					if ('Duration' in selectedMovie) {
+						var tmpHours = Math.floor(selectedMovie['Duration']/60);
+						var tmpMinutes = selectedMovie['Duration']%60;
+						var tmpString = ""
+						if (tmpHours>0) tmpString+= tmpHours+'<span class="hours">h</span> ';
+						if (tmpMinutes>0) tmpString+= tmpMinutes + '<span class="mins">mins</span>';
+						$('#movie-page-subheading').append('<div id="subheading-runtime" class="movie_tile_info movie_duration">'+tmpString+'</div>');
+						/*					<span class="movie_tile_info movie_duration">*/
+					}					
+					if ('Kind' in selectedMovie) $('#movie-page-subheading').append('<div id="subheading-kind">'+selectedMovie['Kind']+'</div>');
+					if (('TrailerID' in selectedMovie) && (selectedMovie['TrailerID']!==null)){
+						var tmpName='\''+selectedMovie['TrailerID']+'\'';
+						$('#movie-page-name').prepend('<div id="movie-page-trailer-button" onClick="revealVideo('+tmpName+')"></div>');
+					}
+
+					if (('TMDBPoster' in selectedMovie) && (selectedMovie['TMDBPoster']!==null)){
+						var tmpFile=CachePath+encodeURIComponent(selectedMovie['Filename'])+".ffiles/poster.jpg";
+						$('#movie-page-poster-container').append('<div id="movie-page-poster"><img src="'+tmpFile+'" alt="poster" title="poster"></div>');
+					}
+
+					if ('ImdbID' in selectedMovie){
+						$('#movie-page-rating-container').append('<div id="movie-page-imdb-logo"><a href="'+BuildIMDBLink(selectedMovie['ImdbID'])+'" target="_blank"><img src="./resources/imdb.svg" alt="imdb logo" title="imdb link"></a></div>');
+						if ("ImdbRating" in selectedMovie) {
+							$('#movie-page-rating-container').append('<div id="movie-page-imdb-rating" title="'+selectedMovie['IMDBRating']+'/10">'+selectedMovie['ImdbRating']+'</div>');
+							//$('#movie-page-rating-container').append('<div class="movie-page-outof">/10</div>');
+						}
+						if ("ImdbVotes" in selectedMovie) {
+								$('#movie-page-rating-container').append('<div id="movie-page-imdb-votes">('+selectedMovie['ImdbVotes']+')');
+						}
+					}
+					if ('TMDBID' in selectedMovie && 'Kind' in selectedMovie){
+						$('#movie-page-rating-container').append('<div id="movie-page-tmdb-logo"><a href="'+BuildTMDBLink(selectedMovie['TMDBID'],selectedMovie['Kind'])+'" target="_blank"><img src="./resources/tmdb.svg" alt="tmdb logo" title="tmdb link"></a></div>');
+						if ("TMDBRating" in selectedMovie) {
+							$('#movie-page-rating-container').append('<div id="movie-page-tmdb-rating" title="'+selectedMovie['TMDBRating']+'/10">'+selectedMovie['TMDBRating']+'</div>');
+							//$('#movie-page-rating-container').append('<div class="movie-page-outof">/10</div>');
+						}
+						if ("TMDBVotes" in selectedMovie) {
+								$('#movie-page-rating-container').append('<div id="movie-page-tmdb-votes">('+selectedMovie['TMDBVotes']+')');
+						}
+					}
+					if ('Metascore' in selectedMovie){
+						if ('MetacriticUrl' in selectedMovie) {
+							$('#movie-page-rating-container').append('<div id="movie-page-meta-logo"><a href="'+selectedMovie['MetacriticUrl']+'" target="_blank"><img src="./resources/metacritic.svg" alt="metacritic logo" title="metacritic link"></a></div>');
+						} else {
+							$('#movie-page-rating-container').append('<div id="movie-page-meta-logo"><img src="./resources/metacritic.svg" alt="metacritic logo" title="metacritic score"></div>');
+						}
+						if ("Metascore" in selectedMovie) {
+							$('#movie-page-rating-container').append('<div id="movie-page-meta-rating">'+selectedMovie['Metascore']+'</div>');
+							$('#movie-page-rating-container').append('<div class="movie-page-outof">%</div>');
+						}
+					}
+
+					function buildPersonElement(Person, element_type = "span", class_prefix = "person", hyperlink = true, portrait = false, character = false){
+						var arrayLength = Person.length;
+						var tmpString="";
+						var tmpArray=[];
+						//compatibility mode: this is for old records, where people where merely string names
+						if (typeof Person[0] === 'string'){
+							tmpString="";
+							tmpString+= "<"+element_type+" class='"+class_prefix+"-no-id'>";
+							tmpString+= Person.join(", ");
+							tmpString+= "</"+element_type+">";
+							tmpArray.push(tmpString);
+							console.log("Warning: moviedata format obsolete, should scrap again!");
+							return tmpArray;
+						}
+						//else, if is {name,id,portrait} actual code:
+						for (var i = 0; i < arrayLength; i++) {
+							tmpString="";
+							if (portrait == true) {
+								tmpClass='person-tile';
+							}else {
+								tmpClass='person-inline';
+							}
+							var dataOrderString="";
+							var tmpOrder = i;
+							var usedOrder;
+							//The ordering algorithm is a bit of black magic - I try to weight in
+							//the order the names appear in the file (since sometimes this is the star order)
+							//while other times, I weight the Order=N key in the dictionary
+							//the existence or lack of portrait also plays big role!
+							//crappy overal. If I ever get tired of this black magic I should
+							//fall back to order original(natural order in the file)
+							if ('Order' in Person[i]) {
+								tmpOrder *= Person[i]['Order'];
+								dataOrderString = " data-order-weighted="+Person[i]['Order'];
+							} else {
+								tmpOrder *= arrayLength;
+							}
+							if ('PortraitURL' in Person[i] && Person[i]['PortraitURL'] !== ""){
+								
+							} else {
+								tmpOrder *= arrayLength;
+							}
+							
+							if (CastOrderBy.toLowerCase() === "weighted"){
+								usedOrder = tmpOrder;
+							} else if (CastOrderBy.toLowerCase() === "file"){
+								usedOrder = i;
+							} else if (CastOrderBy.toLowerCase() === "key"){
+								if ('Order' in Person[i]) {
+									usedOrder = Person[i]['Order'];
+								} else {
+									usedOrder= arrayLength+i;
+								}
+							}
+
+							tmpString+= "<div class='"+tmpClass+" "+class_prefix+"-"+Person[i]['ImdbID']+"' style='order:"+ usedOrder +"' data-order-key="+ usedOrder + dataOrderString +" data-order-file="+i+">";
+							if (hyperlink == true && 'ImdbID' in Person[i]){
+								tmpString+="<a class='person-link' target='_blank' href='"+BuildIMDBLink(Person[i]['ImdbID'],"person")+"'>";
+							}
+							if (portrait == true) {
+								tmpURL ="";
+								if ('PortraitURL' in Person[i]) {
+									tmpURL = "http://image.tmdb.org/t/p/w185//"+Person[i]['PortraitURL'];
+								}
+								if (tmpURL !== ""){
+								tmpString+="<div class='person-portrait-container'>";
+									tmpString+="<div class='person-portrait' style='background-image:url(\""+tmpURL+"\")'>";
+									tmpString+= "</div>";
+									tmpString+= "</div>";
+								}
+							}
+							tmpString+="<div class='person-label-container'>";
+							tmpString+= Person[i]['Name'];
+
+							tmpString+= "</div>";
+							if (hyperlink == true && 'ImdbID' in Person[i]){
+								tmpString+="</a>";
+							}
+							if (character == true && 'Character' in Person[i]){
+								tmpString+="<div class='person-character-container'>";
+								tmpString+= Person[i]['Character'];
+								tmpString+= "</div>";
+							}
+							tmpString+= "</div>";
+							tmpArray.push(tmpString);
+						}
+						return tmpArray;
+					}
+
+					if ("CreatedBy" in selectedMovie && selectedMovie['CreatedBy'].length > 0) {
+						$('#movie-page-crew-container').append('<div id="crew-created-by"class="crew-section margin-bottom-04"><span class="label bio-category">Created by:</span>'
+							+buildPersonElement(selectedMovie['CreatedBy'],"span","created-by",true,false,false).join(", ")+'</div>');
+					}
+					if ("Directors" in selectedMovie && selectedMovie['Directors'].length > 0) {
+						$('#movie-page-crew-container').append('<div id="crew-directors" class="crew-section margin-bottom-04"><span class="label bio-category">Directed by:</span>'
+							+buildPersonElement(selectedMovie['Directors'],"span","director",true,false,false).join(", ")+'</div>');
+					}
+					if ("ArtDirectors" in selectedMovie && selectedMovie['ArtDirectors'].length > 0) {
+						$('#movie-page-crew-container').append('<div id="crew-art-directors"class="crew-section margin-bottom-04"><span class="label bio-category">Art Direction by:</span>'
+							+buildPersonElement(selectedMovie['ArtDirectors'],"span","art-director",true,false,false).join(", ")+'</div>');
+					}
+					if ('Cinematographers' in selectedMovie && selectedMovie['Cinematographers'].length > 0) {
+						$('#movie-page-crew-container').append('<div id="crew-cinematographers"class="crew-section margin-bottom-04"><span class="label bio-category">Cinematography by:</span>'+buildPersonElement(selectedMovie['Cinematographers'],"span","cinematographer",true,false,false).join(", ")+'</div>');
+					}
+					if ('Writers' in selectedMovie && selectedMovie['Writers'].length > 0) {	
+						var tmpPerson = buildPersonElement(selectedMovie['Writers'],"span","writer",true,false,false);
+						var tmpWriters = tmpPerson.slice(0, 3); //display first 3 writers only
+						var tmpWritersRest = tmpPerson.slice(3, tmpPerson.length); //add the rest into details	
+						if (tmpWritersRest.length>0) {
+							$('#movie-page-crew-container').append('<div id="crew-writers"class="crew-section margin-bottom-04"><span class="label bio-category">Written by:</span>'+tmpWriters.join(", ")+'<details><summary></summary>'+tmpWritersRest.join(", ")+'</div></details>');
+						} else {
+							$('#movie-page-crew-container').append('<div id="crew-writers"class="crew-section margin-bottom-04"><span class="label bio-category">Written by:</span>'+tmpWriters.join(", ")+'</div>');
+						}
+					}
+					if ('Producers' in selectedMovie && selectedMovie['Producers'].length > 0) {
+						var tmpPerson = buildPersonElement(selectedMovie['Producers'],"span","producer",true,false,false);
+						var tmpProducers = tmpPerson.slice(0, 3); //display first 3 producers only
+						var tmpProducersRest = tmpPerson.slice(3, tmpPerson.length); //add the rest into details	
+						if (tmpProducersRest.length>0) {
+							$('#movie-page-crew-container').append('<div id="crew-producers"class="crew-section margin-bottom-04"><span class="label bio-category">Produced by:</span>'+tmpProducers.join(", ")+'<details><summary></summary>'+tmpProducersRest.join(", ")+'</div></details>');
+						} else {
+							$('#movie-page-crew-container').append('<div id="crew-producers"class="crew-section margin-bottom-04"><span class="label bio-category">Produced by:</span>'+tmpProducers.join(", ")+'</div>');
+						}
+					}
+					if ('Languages' in selectedMovie && selectedMovie['Languages'].length > 0) {
+						$('#movie-page-crew-container').append('<div id="crew-languages"class="crew-section bio-category margin-bottom-04"><span class="label bio-category">Languages:</span>'+selectedMovie['Languages'].join(", ")+'</div>');
+					}
+					if ('Cast' in selectedMovie && selectedMovie['Cast'].length > 0) {
+						var tmpPerson = buildPersonElement(selectedMovie['Cast'],"span","cast",true,true,true);
+						var tmpCast = tmpPerson; //tmpPerson.slice(0, {{ HowManyActorsShouldDisplay }} ) //display first 5 actors only only
+						var tmpCastRest = ""; //tmpPerson.slice({{ HowManyActorsShouldDisplay }}, tmpPerson.length); //add the rest into details
+						if (tmpCastRest.length>0) {
+							$('#movie-page-cast-container').append('<div id="crew-cast"><span class="label">Starring:</span><div id="crew-cast-stars">'+tmpCast.join(" ")+'</div><details><summary></summary><div id="crew-cast-rest">'+tmpCastRest.join(", ")+'</div></details></div>');
+						} else {
+							$('#movie-page-cast-container').append('<div id="crew-cast"><span class="label movie-page-label">Starring</span>'+tmpCast.join(" ")+'</div>');
+						}
+					}
+					
+					if ('Images' in selectedMovie && selectedMovie['Images'].length > 0 && Array.isArray(selectedMovie['Images'])){
+						console.log(selectedMovie['Images'])
+						var i=0;
+						selectedMovie['Images'].forEach(function(item){
+								var tmpURL = "http://image.tmdb.org/t/p/w185//"+item;
+								var tmpOriginalURL = "http://image.tmdb.org/t/p/original//"+item;
+								$('#movie-page-gallery-container').append('<div id="gallery-image-tile-'+(i++)+'"class="gallery-tile"><a href="'+tmpOriginalURL+'" target="_blank"><img src="'+tmpURL+'"><a/></div>');
+						});
+					}
+					 //console.log("cleaning up...");
+					 $('#movie-page-container').removeClass('animated fadeOut faster');
+					 //console.log("displaying movie page");
+					 $('#movie-page-container').addClass('animated fadeInDown faster');
+					 /*$('#movie-page-header').addClass('animated slideInDown');
+					 $('#movie-summary-title').addClass('animated fadeIn delay-250ms duration-1500ms');
+					 $('#movie-summary-text').addClass('animated fadeIn delay-500ms duration-1500ms');*/
+					 //console.log("setting visibility to true");
+					 $('#movie-page-container').addClass('overlay-visible');
+					 if ("TrailerID" in selectedMovie){
+					 	//console.log(selectedMovie['TrailerID']);
+					 	player.cueVideoById(selectedMovie['TrailerID']);	
+					 	//console.log("cueing...");
+					 }
+ 					 return;   // The function returns the product of p1 and p2
+				}
+
+				function CloseMoviePage() {
+					hideVideo();
+			      	/*window.addEventListener(
+						'resize',
+						(grid._resizeHandler = grid.debounce(function() {
+							grid.refreshItems().layout();
+						}, layoutOnResize))
+					);*/
+					//console.log("cleaning up(2)...");
+					$('#movie-page-container').removeClass('animated fadeInDown faster');
+					/*$('#movie-page-header').removeClass('animated slideInDown');
+					$('#movie-summary-title').removeClass('animated fadeIn delay-250ms duration-1500ms');
+					$('#movie-summary-text').removeClass('animated fadeIn delay-500ms duration-1500ms');*/
+	 
+					var y = document.getElementById("movie-page-container");
+					//console.log("adding event listeners(2)");
+					y.addEventListener("animationend", function(e) {
+						e.stopPropagation();
+						//console.log("anim_end");
+						DoneHidingMoviePage(e);
+					},{once: true});
+					y.addEventListener("animationcancel", function(e) {
+						e.stopPropagation();
+						//console.log("anim_end_cancel");
+						DoneHidingMoviePage(e);
+					},{once: true});
+					//console.log("animating out");
+					$('#movie-page-container').addClass("animated fadeOutUp fast");
+					function DoneHidingMoviePage(e) {
+						//console.log("Z: "+ e.target);
+						//console.log("Y: "  +y);
+						$('#movie-page-container').removeClass("overlay-visible");
+						$('#movie-page-container').removeClass("animated fadeOutUp fast");
+						$(document.body).css("overflow","initial");
+						e.stopPropagation();
+						/* EMPTY the DOM tree of the Movie Page*/
+						$("#movie-page-poster-container").empty();
+						$("#movie-page-gallery-container").empty();
+						$("#movie-page-crew-container").empty();
+						$("#movie-page-cast-container").empty();
+						$("#movie-page-plot-container").empty();
+						$("#movie-page-name").empty();
+						$("#movie-page-subheading").empty();
+						$("#movie-page-rating-container").empty();
+						var str = $("#movie-page").clone().html();
+						$("#movie-page").empty();
+						/*why rebuilding the page elements? because for some reason I can reset the scrolling of the containers!*/
+						$("#movie-page").append(str);
+						
+					}
+					grid.refreshItems().layout();
+					window.addEventListener(
+						'resize',
+						(grid._resizeHandler = (function() {
+							grid.refreshItems().layout();
+						}))
+					);
+
+				};
+
+
+
+				function BuildIMDBLink(ID,mode = "movie"){
+					//https://www.imdb.com/title/tt0816692
+					str=""
+					if (mode === "person")
+					{
+						if (typeof ID === 'string'){
+							str = ID;
+						} else if (typeof ID === 'int'){
+							str = ID.toString();
+						} else {
+							console.log("bug, no actor ID!")
+							return '';
+						}
+						return 'https://www.imdb.com/name/nm'+str.padStart(7,'0');
+					} else if (mode === "movie") {
+						if (ID){
+							str = ID.toString();
+							return 'https://www.imdb.com/title/tt'+str.padStart(7,'0');
+						} else {
+							return '';
+						}
+					}
+				}
+
+				function BuildTMDBLink(ID,mode = "movie"){
+					//https://www.themoviedb.org/
+					str=""
+					if (mode === "person")
+					{
+						if (typeof ID === 'string'){
+							str = ID;
+							console.log("actor id is string!")
+						} else if (typeof ID === 'int'){
+							str = ID.toString();
+							console.log("actor id is int")
+						} else {
+							console.log("bug, no actor ID!")
+							return '';
+						}
+						return 'https://www.themoviedb.org/person/'+str;
+					} else if (mode === "movie") {
+						if (ID){
+							str = ID.toString();
+							return 'https://www.themoviedb.org/movie/'+str;
+						} else if (mode === "tv") {
+							if (ID){
+								str = ID.toString();
+								return 'https://www.themoviedb.org/tv/'+str;
+						}} else {
+							return '';
+						}
+					}
+				}
+
+				function BuildYoutubeLink(videoID){
+					//https://www.youtube.com/watch?v=SUXWAEX2jlg
+					if (videoID) {
+						return 'https://www.youtube.com/v/'+videoID;
+					} else{
+						return '';
+					}
+				}
+				function onYouTubeIframeAPIReady() {
+				 	player = new YT.Player('player', {
+						height: '585',
+						width: '960',
+						videoId: 'UjA0OuhZLvY',
+						playerVars: {
+							rel: 0,
+							disablekb: 1,
+							controls: 1,
+							showinfo: 0,
+							autoplay: 0,
+							loop: 0,
+							modestbranding: 1,
+						},
+						events: {
+							'onReady': onPlayerReady,
+							'onError': onPlayerError,
+							'onStateChange': onPlayerStateChange
+						}
+					});
+					/**/
+				}
+				function onPlayerReady(e) {
+						//console.log("ready, starting!");
+					}
+				function onPlayerStateChange(e) {
+					//console.log(e);
+					//console.log(e.data);
+						/*if (e.data == YT.PlayerState.PLAYING && !done) {
+							setTimeout(stopVideo, 6000);
+							done = true;
+						}*/
+					}
+				function onPlayerError(e) {
+					//console.log(event);
+					console.log("error opening trailer");
+					var videoURL = e.target.getVideoUrl();
+					console.log(videoURL);
+					//console.log(e.target.getVideoData());
+					var win = window.open(videoURL, '_blank');
+					if (win) {
+					    //Browser has allowed it to be opened
+						console.log("opened in external window");
+					    win.focus();
+					    hideVideo();
+					}
+				}
+				function stopVideo() {
+						player.stopVideo();
+					}	
+
+				function hideVideo(TrailerID)
+				{
+					player.stopVideo();
+					$('.lightbox').css("display","none");
+				}
+				function revealVideo(TrailerID) {
+					//console.log("TI1: "+TrailerID);
+					// 3. This function creates an <iframe> (and YouTube player)
+					//    after the API code downloads.
+					//player.loadVideoById(TrailerID);
+					player.playVideo();
+					//console.log(player);
+					$('.lightbox').css("display","block"); //?showinfo=0&autoplay=1
+					
+					// 5. The API calls this function when the player's state changes.
+					//    The function indicates that when playing a video (state=1),
+					//    the player should play for six seconds and then stop.
+					
+					
+					//$('#trailer-container').append('<iframe id="youtube" width="960" height="540" src="" frameborder="0" allowfullscreen></iframe>');
+					//var video = document.getElementById("youtube").src;
+  					//document.getElementById("youtube").src = BuildYoutubeLink(TrailerID)+'&autoplay=1';
+					//$("#youtube").attr("src",BuildYoutubeLink(TrailerID));
+					
+				}
+  			</script>
+  			<script>
+  				// 2. This code loads the IFrame Player API code asynchronously.
+				var tag = document.createElement('script');
+				tag.src = "https://www.youtube.com/iframe_api";
+				var firstScriptTag = document.getElementsByTagName('script')[0];
+				firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+  			</script>
+		{% else %}
+		<p>Nothing Found</p>
+		{% endif %}
+	</body>
+</html>
