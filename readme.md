@@ -33,8 +33,26 @@ Supports various sorting options, as well as filtering by media type (movie,tv s
 The MovieCatalog `index.html` page is responsive, allows switching between light/dark mode easily and links to trailers in order to provide a one-stop experience to the user.
 It displays the Director of Photography/Cinematographer since I find it quite important. There are links for the movies/shows and the cast/crew members to their respective IMDB and TMDB pages.
 
-## Using
-This is the readme file!
+## Installation
+1. Copy the files `main.py`,`DefaultSettings.py`,`templates/` and `resources/` into a folder
+2. Install Python3, get the dependencies (requirements.txt) and build the environment.
+3. In order to use the script, you need a free account at http://www.themoviedb.org
+  - request a free API key at https://developers.themoviedb.org/3/getting-started/introduction
+  - open the file `DefaultSettings.py` and paste the API key inside the quotes of `myTMDB_APIkey='__________________'`
+4. Find the absolute path of the folder where the movies are,
+  - open the file `DefaultSettings.py` and paste the absolute path inside the quotes of `SourcePath=''` eg. `SourcePath='/Users/User1/MyFiles/Movies/'`
+5. Save the file.
+
+## Usage
+### Basic Usage
+- run `main.py -s` to **scan** for new/deleted movie files and then rebuild the html file.
+### Changing mismatches
+If the movie was matched to the wrong IMDB id, or not matched at all, or incomplete data was fetched:
+- run `main.py -l unimported` (unimported or all,ambiguous,verified,incomplete) to **display** the files that were affected.
+- run `main.py -c -f <filename> -i <new imdbID>` with the filename and the correct IMDB ID(eg.`main.py -c -f 'Vertigo.mp4' -i 0052357`)
+### Other usage
+- run `main.py` to **rebuilds** the `index.html` without scanning for new/deleted files
+- run `main.py -?` displays command-line parameters
 
 ## Limitations/Compatibility
 It has been tested on Opera, Firefox and Safari

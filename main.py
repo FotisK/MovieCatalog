@@ -1138,13 +1138,8 @@ def BuildLaunchOptions(argv):
 				sys.exit()
 	return LaunchOptions
 
-#myOMDB_APIkey='35c2792c' #my omdbapi.com API key
-myTMDB_APIkey='096187be7a5391bfa9843173e059137d' #themoviedb.org API key
-#SourceRelativePath='movies' #subfolder with the Source files (movies etc)
-#SourcePath=os.path.join(os.getcwd(),SourceRelativePath)
-SourcePath='' 
-#SourcePath or SourceRelativePath?: if the script is in the same path as the movies, you can use the relative path. Otherwise, use the absolute path :-)
-
+SourceRelativePath = None
+SourcePath = None
 CacheRelativePath='cache'
 CachePath=os.path.join(os.getcwd(),CacheRelativePath)
 TemplatesRelativePath='templates'
@@ -1155,8 +1150,21 @@ constHowManyActorsShouldDisplay = 6 #pass this const/var to javascript - how man
 shouldCrossReferenceOnDuckDuckGo = False #was working fine set to True, until duckduckgo stopped working on my computer! Perhaps I was throttles, perhaps it's country-wide issue.
 CurrentMovieDataFileVersion = 19032501 #format: YY+MM+DD+INC:0,1,2.. changing this, causes the moviedata files to be modified/touched/updated
 DefaultThumbnailWidth = 256 #256px
-ValidFileTypes = [".mkv",".avi",".mp4",".mov",".mpeg",".txt",".torrent"] #list of valid filetypes to treat as movie names and fetch their data
-includeFoldersInValidFileTypes = True #additionally allow folders to be treated as movie names and fetch their data
+#ValidFileTypes = [".mkv",".avi",".mp4",".mov",".mpeg",".txt",".torrent"] #list of valid filetypes to treat as movie names and fetch their data
+#includeFoldersInValidFileTypes = True #additionally allow folders to be treated as movie names and fetch their data
+from DefaultSettings import *
+try:
+    from UserSettings import * #if UserSettings.py exists, it overwrites Defaults settings
+except ImportError:
+    pass
+if SourceRelativePath and not SourcePath:
+	SourcePath=os.path.join(os.getcwd(),SourceRelativePath)
+if not myTMDB_APIkey:
+	print("Error: You haven't set an TMDB_APIkey. You need to create an account on TMDB, request an API key and set the generated key into the DefaultSettings.py - sample value: myTMDB_APIkey='036119ba3e5391bfb9941113a089417e'")
+	exit()
+if not SourcePath and not SourceRelativePath:
+	print("Error: You haven't set a folder where the movies are. Open DefaultSettings.py and set SourcePath (absolute) or SourceRelativePath (relative) into the desired one")
+	exit()
 
 ia = imdb.IMDb() #imdb object
 
