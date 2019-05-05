@@ -2,7 +2,7 @@ MovieCatalog
 ========
 
 ## What is MovieCatalog?
-**Movie Catalog** is a python script that fetches movie data from various sources (imdb,tmdb) and generates a user-friendly catalog for all the movies the user has inside a folder. I created it to best manage my watchlist and quickly scan for movie information without jumping from site to site.
+**Movie Catalog** is a python script that fetches movie data from various sources (imdb,tmdb,youtube,google) and generates a user-friendly catalog for all the movies the user has inside a folder. I created it to best manage my watchlist and quickly scan for movie information without jumping from site to site. It can work however on things such as movie files, screenshots, subtitle collections, or torrent files, or simple text files as long as the filenames are indicative of a movie.
 
 ![image1](readme.resources/scroll09.gif)
 
@@ -45,7 +45,8 @@ It displays the Director of Photography/Cinematographer since I find it quite im
 
 ## Usage
 ### Basic Usage
-- run `main.py -s` to **scan** for new/deleted movie files and then rebuild the html file.
+- run `main.py -s` to **scan** for new/deleted movie files and then rebuild the html file. When importing many files, there may be some random waiting intervals to prevent blacklisting on google.com
+- open `index.html` in your browser
 ### Changing mismatches
 If the movie was matched to the wrong IMDB id, or not matched at all, or incomplete data was fetched:
 - run `main.py -l unimported` (unimported or all,ambiguous,verified,incomplete) to **display** the files that were affected.
@@ -55,9 +56,13 @@ If the movie was matched to the wrong IMDB id, or not matched at all, or incompl
 - run `main.py -?` displays command-line parameters
 
 ## Limitations/Compatibility
-It has been tested on Opera, Firefox and Safari
-Tested with databased <700
+It has been tested on Opera, Firefox and Safari and Python3.
+Tested with 700 movies. Since there is no actual database, more files mean slower performance
 
 ## future work
+[ ] get rid of the command-line interface and allow movie-meta editing via the app (django/flask)
+[ ] store data in an SQL database
+[ ] allow import from imdb watchlist
+[ ] allow scanning multiple locations
 
 ## installation
