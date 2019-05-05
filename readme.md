@@ -64,5 +64,3 @@ Tested with 700 movies. Since there is no actual database, more files mean slowe
 [ ] store data in an SQL database
 [ ] allow import from imdb watchlist
 [ ] allow scanning multiple locations
-
-## installation
