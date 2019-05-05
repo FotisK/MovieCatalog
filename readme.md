@@ -15,6 +15,8 @@ The resulting catalog can be found inside the `index.html` file.
 ## How does MovieCatalog find which movies to download data for?
 **MovieCatalog** is filesystem-based meaning that it scans a specific folder (*Source*) for files and folders (eg. .srt files, video files, .torrent files or .txt files) and fetches the information for the movies extracted from the filenames. In other words, it treats the folder's content, as a list of movie names. The downloaded data are kept in a `cache` folder.
 
+![filelist](readme.resources/filelist01.jpg)
+
 ## Features
 ### Runs on demand
 **MovieCatalog** does not run in the background but can be automated to run when a file is added or removed from a folder (eg via smart folders/Automator) - The .py script updates the catalog by scanning changes in the *Source* folder, fetching the data and rebuilding the monolithic `index.html` file and then quits. 
