@@ -2,12 +2,9 @@ MovieCatalog
 ========
 
 ## What is MovieCatalog?
-Movie Catalog is a python script that fetches movie data from various sources (imdb,tmdb) and generates a user-friendly catalog for all the movies the user has inside a folder.
+**Movie Catalog** is a python script that fetches movie data from various sources (imdb,tmdb) and generates a user-friendly catalog for all the movies the user has inside a folder. I created it to best manage my watchlist and quickly scan for movie information without jumping from site to site.
 
 ![image1](readme.resources/scroll09.gif)
-
-I created it to best manage my watchlist and quickly scan for movie information without jumping from site to site.
-
 ![movie page](readme.resources/moviepage03.gif)
 
 The resulting catalog can be found inside the `index.html` file. 
