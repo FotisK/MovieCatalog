@@ -59,10 +59,10 @@ If the movie was matched to the wrong IMDB id, or not matched at all, or incompl
 
 ## Limitations/Compatibility
 It has been tested on Opera, Firefox and Safari and Python3.
-Tested with 700 movies. Since there is no actual database, more files mean slower performance
+Tested with 700 movies. Since there is no actual database on the backend, more files mean slower performance overall
 
 ## future work
-[ ] get rid of the command-line interface and allow movie-meta editing via the app (django/flask)
-[ ] store data in an SQL database
-[ ] allow import from imdb watchlist
-[ ] allow scanning multiple locations
+- [ ] get rid of the command-line interface and allow movie-meta editing via the app (django/flask)
+- [ ] store data in an SQL database
+- [ ] allow import from imdb watchlist
+- [ ] allow scanning multiple locations
