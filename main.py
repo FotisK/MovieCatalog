@@ -246,18 +246,20 @@ def RemoveAuthorFromPlot(StringToReplace):
 	return Result
 
 def ConvertCountryCodeToName(Countries):
-	for index in range(len(Countries)):
-		Country = Countries[index]
-		if len(Country) == 2:
-			Countries[index] = CountryNameByCode(Country)
-	return Countries
+	if Countries:
+		for index in range(len(Countries)):
+			Country = Countries[index]
+			if len(Country) == 2:
+				Countries[index] = CountryNameByCode(Country)
+		return Countries
 
 def ConvertLanguageCodeToName(Languages):
-	for index in range(len(Languages)):
-		Lang=Languages[index]
-		if len(Lang) == 2:
-			Languages[index] = LanguageNameByCode(Lang)
-	return Languages
+	if Languages:
+		for index in range(len(Languages)):
+			Lang=Languages[index]
+			if len(Lang) == 2:
+				Languages[index] = LanguageNameByCode(Lang)
+		return Languages
 
 def isIMDBURL(URLString):
 	#if this String an IMDB movie url?
