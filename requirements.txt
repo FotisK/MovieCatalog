@@ -12,7 +12,7 @@ Kivy-Garden==0.1.4
 lxml==4.3.0
 MarkupSafe==1.1.0
 parse-torrent-name==1.1.1
-Pillow==5.4.1
+Pillow==6.2.0
 pipenv==2018.11.26
 Pygments==2.3.1
 requests==2.21.0
