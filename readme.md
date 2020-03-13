@@ -54,7 +54,7 @@ If the movie was matched to the wrong IMDB id, or not matched at all, or incompl
 - run `main.py -l unimported` (unimported or all,ambiguous,verified,incomplete) to **display** the files that were affected.
 - run `main.py -c -f <filename> -i <new imdbID>` with the filename and the correct IMDB ID(eg.`main.py -c -f 'Vertigo.mp4' -i 0052357`)
 ### Other usage
-- run `main.py` to **rebuilds** the `index.html` without scanning for new/deleted files
+- run `main.py` to **rebuild** the `index.html` without scanning for new/deleted files
 - run `main.py -?` displays command-line parameters
 
 ###notes using with pipenv/pip3##
