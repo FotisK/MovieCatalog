@@ -1136,7 +1136,7 @@ def WrapTMDBDataInIMDB(IMDBMovieID):
 
     if response.status_code == requests.codes.ok:
         current_time = time.time()
-        if int(response.headers["X-RateLimit-Remaining"]) <= 1:
+        if "X-RateLimit-Remaining" in response.headers and int(response.headers["X-RateLimit-Remaining"]) <= 1:
             while int(response.headers["X-RateLimit-Reset"]) + 1 > time.time():
                 print("TMDB:Reached rate-limit. Waiting...")
                 time.sleep(1)
