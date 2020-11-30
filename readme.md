@@ -57,7 +57,7 @@ If the movie was matched to the wrong IMDB id, or not matched at all, or incompl
 - run `main.py` to **rebuild** the `index.html` without scanning for new/deleted files
 - run `main.py -?` displays command-line parameters
 
-### notes using with pipenv/pip3 ###
+### notes using with pipenv/pip3
 pipenv run python3 main.py -s
 
 ## Limitations/Compatibility
