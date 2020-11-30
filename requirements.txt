@@ -5,7 +5,7 @@ chardet==3.0.4
 docutils==0.14
 google==2.0.1
 idna==2.8
-IMDbPY==6.7.dev20190222
+IMDbPY==6.7
 Jinja2==2.10.1
 Kivy==1.10.1
 Kivy-Garden==0.1.4
